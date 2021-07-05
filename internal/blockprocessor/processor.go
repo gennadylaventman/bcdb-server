@@ -4,6 +4,7 @@ package blockprocessor
 
 import (
 	"sync"
+	"time"
 
 	"github.com/IBM-Blockchain/bcdb-server/internal/blockstore"
 	"github.com/IBM-Blockchain/bcdb-server/internal/mptrie"
@@ -98,9 +99,41 @@ func (b *BlockProcessor) Start() {
 			}
 			block := blockData.(*types.Block)
 
-			if err = b.validateAndCommit(block); err != nil {
+			start := time.Now()
+			b.logger.Debugf("validating and committing block %d", block.GetHeader().GetBaseHeader().GetNumber())
+			validationInfo, err := b.validator.validateBlock(block)
+			if err != nil {
 				panic(err)
 			}
+			b.logger.Infof("time taken to validate the block: %s", time.Since(start).String())
+
+			block.Header.ValidationInfo = validationInfo
+
+			start = time.Now()
+			if err := b.blockStore.AddSkipListLinks(block); err != nil {
+				panic(err)
+			}
+			b.logger.Infof("time taken to add skip list links to the block: %s", time.Since(start).String())
+
+			start = time.Now()
+			root, err := mtree.BuildTreeForBlockTx(block)
+			if err != nil {
+				panic(err)
+			}
+			block.Header.TxMerkelTreeRootHash = root.Hash()
+			b.logger.Infof("time taken to build merkle tree for block: %s", time.Since(start).String())
+
+			start = time.Now()
+			if err = b.committer.commitBlock(block); err != nil {
+				panic(err)
+			}
+			b.logger.Infof("time taken to conmmit the block: %s", time.Since(start).String())
+
+			b.logger.Infof(
+				"validated and committed block %d having %d transactions\n",
+				block.GetHeader().GetBaseHeader().GetNumber(),
+				len(validationInfo),
+			)
 
 			//TODO Detect config changes that affect the replication component and return an appropriate non-nil object
 			// to instruct it to reconfigure itself. See issues:
