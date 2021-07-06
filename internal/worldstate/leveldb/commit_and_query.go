@@ -174,7 +174,7 @@ func (l *LevelDB) Commit(dbsUpdates map[string]*worldstate.DBUpdates, blockNumbe
 		if err := l.commitToDB(dbName, db, updates); err != nil {
 			return err
 		}
-		l.logger.Debugf("changes committed to the database %s, took %d ms, available dbs are [%s]", dbName, time.Since(start).Milliseconds(), l.dbs)
+		l.logger.Infof("changes committed to the database %s, took %d ms", dbName, time.Since(start).Milliseconds())
 	}
 
 	l.dbsList.RLock()
@@ -188,11 +188,13 @@ func (l *LevelDB) Commit(dbsUpdates map[string]*worldstate.DBUpdates, blockNumbe
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
+	start := time.Now()
 	b := make([]byte, binary.MaxVarintLen64)
 	binary.PutUvarint(b, blockNumber)
 	if err := db.file.Put(lastCommittedBlockNumberKey, b, &opt.WriteOptions{}); err != nil {
 		return errors.Wrapf(err, "error while storing the last committed block number [%d] to the metadataDB", blockNumber)
 	}
+	l.logger.Infof("the time taken to update the block height to %d is %dms", blockNumber, time.Since(start).Milliseconds())
 
 	return nil
 }
