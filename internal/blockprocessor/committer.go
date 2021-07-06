@@ -4,6 +4,7 @@ package blockprocessor
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/IBM-Blockchain/bcdb-server/internal/blockstore"
 	"github.com/IBM-Blockchain/bcdb-server/internal/identity"
@@ -42,16 +43,20 @@ func newCommitter(conf *Config) *committer {
 }
 
 func (c *committer) commitBlock(block *types.Block) error {
+	start := time.Now()
 	// Calculate expected changes to world state db and provenance db
 	dbsUpdates, provenanceData, err := c.constructDBAndProvenanceEntries(block)
 	if err != nil {
 		return errors.WithMessagef(err, "error while constructing database and provenance entries for block %d", block.GetHeader().GetBaseHeader().GetNumber())
 	}
+	c.logger.Infof("the time taken to construct entries for worldstate and provenance store is %s", time.Since(start).String())
 
+	start = time.Now()
 	// Update state trie with expected world state db changes
 	if err := c.applyBlockOnStateTrie(dbsUpdates); err != nil {
 		panic(err)
 	}
+	c.logger.Infof("the time taken to apply block on state trie is %s", time.Since(start).String())
 	stateTrieRootHash, err := c.stateTrie.Hash()
 	if err != nil {
 		panic(err)
@@ -59,6 +64,7 @@ func (c *committer) commitBlock(block *types.Block) error {
 	// Update block with state trie root
 	block.Header.StateMerkelTreeRootHash = stateTrieRootHash
 
+	start = time.Now()
 	// Commit block to block store
 	if err := c.commitToBlockStore(block); err != nil {
 		return errors.WithMessagef(
@@ -67,14 +73,21 @@ func (c *committer) commitBlock(block *types.Block) error {
 			block.GetHeader().GetBaseHeader().GetNumber(),
 		)
 	}
+	c.logger.Infof("the time taken to commit the block to block store is %s", time.Since(start).String())
 
 	// Commit block to world state db and provenance db
 	if err = c.commitToDBs(dbsUpdates, provenanceData, block); err != nil {
 		return err
 	}
 
+	start = time.Now()
 	// Commit state trie changes to trie store
-	return c.commitTrie(block.GetHeader().GetBaseHeader().GetNumber())
+	if err := c.commitTrie(block.GetHeader().GetBaseHeader().GetNumber()); err != nil {
+		return err
+	}
+	c.logger.Infof("the time taken to commit the state trie is %s", time.Since(start).String())
+
+	return nil
 }
 
 func (c *committer) commitToBlockStore(block *types.Block) error {
@@ -88,11 +101,19 @@ func (c *committer) commitToBlockStore(block *types.Block) error {
 func (c *committer) commitToDBs(dbsUpdates map[string]*worldstate.DBUpdates, provenanceData []*provenance.TxDataForProvenance, block *types.Block) error {
 	blockNum := block.GetHeader().GetBaseHeader().GetNumber()
 
+	start := time.Now()
 	if err := c.commitToProvenanceStore(blockNum, provenanceData); err != nil {
 		return errors.WithMessagef(err, "error while committing block %d to the block store", blockNum)
 	}
+	c.logger.Infof("the time taken to commit the block to provenance store is %s", time.Since(start).String())
 
-	return c.commitToStateDB(blockNum, dbsUpdates)
+	start = time.Now()
+	if err := c.commitToStateDB(blockNum, dbsUpdates); err != nil {
+		return err
+	}
+	c.logger.Infof("the time taken to commit the block to worldstate DB is %s", time.Since(start).String())
+
+	return nil
 }
 
 func (c *committer) commitToProvenanceStore(blockNum uint64, provenanceData []*provenance.TxDataForProvenance) error {
