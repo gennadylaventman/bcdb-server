@@ -144,9 +144,8 @@ func TestCommitter(t *testing.T) {
 		env := newCommitterTestEnv(t)
 		defer env.cleanup()
 
-		createDB := []*worldstate.DBUpdates{
-			{
-				DBName: worldstate.DatabasesDBName,
+		createDB := map[string]*worldstate.DBUpdates{
+			worldstate.DatabasesDBName: {
 				Writes: []*worldstate.KVWithMetadata{
 					{
 						Key: "db1",
@@ -343,9 +342,8 @@ func TestStateDBCommitterForDataBlock(t *testing.T) {
 	t.Parallel()
 
 	setup := func(db worldstate.DB) {
-		createDB := []*worldstate.DBUpdates{
-			{
-				DBName: worldstate.DatabasesDBName,
+		createDB := map[string]*worldstate.DBUpdates{
+			worldstate.DatabasesDBName: {
 				Writes: []*worldstate.KVWithMetadata{
 					{
 						Key: "db1",
@@ -355,9 +353,8 @@ func TestStateDBCommitterForDataBlock(t *testing.T) {
 		}
 		require.NoError(t, db.Commit(createDB, 1))
 
-		data := []*worldstate.DBUpdates{
-			{
-				DBName: worldstate.DefaultDBName,
+		data := map[string]*worldstate.DBUpdates{
+			worldstate.DefaultDBName: {
 				Writes: []*worldstate.KVWithMetadata{
 					constructDataEntryForTest("key1", []byte("value1"), &types.Metadata{
 						Version: &types.Version{
@@ -374,8 +371,7 @@ func TestStateDBCommitterForDataBlock(t *testing.T) {
 					constructDataEntryForTest("key3", []byte("value3"), nil),
 				},
 			},
-			{
-				DBName: "db1",
+			"db1": {
 				Writes: []*worldstate.KVWithMetadata{
 					constructDataEntryForTest("key1", []byte("value1"), &types.Metadata{
 						Version: &types.Version{
@@ -672,9 +668,8 @@ func TestStateDBCommitterForUserBlock(t *testing.T) {
 				user2 := constructUserForTest(t, "user2", nil, nil, sampleVersion, nil)
 				user3 := constructUserForTest(t, "user3", nil, nil, sampleVersion, nil)
 				user4 := constructUserForTest(t, "user4", nil, nil, sampleVersion, nil)
-				users := []*worldstate.DBUpdates{
-					{
-						DBName: worldstate.UsersDBName,
+				users := map[string]*worldstate.DBUpdates{
+					worldstate.UsersDBName: {
 						Writes: []*worldstate.KVWithMetadata{
 							user1,
 							user2,
@@ -760,9 +755,8 @@ func TestStateDBCommitterForUserBlock(t *testing.T) {
 		{
 			name: "tx is marked invalid",
 			setup: func(env *committerTestEnv) {
-				users := []*worldstate.DBUpdates{
-					{
-						DBName: worldstate.UsersDBName,
+				users := map[string]*worldstate.DBUpdates{
+					worldstate.UsersDBName: {
 						Writes: []*worldstate.KVWithMetadata{
 							constructUserForTest(t, "user1", nil, nil, sampleVersion, nil),
 						},
@@ -855,9 +849,8 @@ func TestStateDBCommitterForDBBlock(t *testing.T) {
 		{
 			name: "create new DBss and delete existing DBs",
 			setup: func(db worldstate.DB) {
-				createDBs := []*worldstate.DBUpdates{
-					{
-						DBName: worldstate.DatabasesDBName,
+				createDBs := map[string]*worldstate.DBUpdates{
+					worldstate.DatabasesDBName: {
 						Writes: []*worldstate.KVWithMetadata{
 							{
 								Key: "db1",
@@ -921,9 +914,8 @@ func TestStateDBCommitterForDBBlock(t *testing.T) {
 				)
 				require.NoError(t, err)
 
-				createDBs := []*worldstate.DBUpdates{
-					{
-						DBName: worldstate.DatabasesDBName,
+				createDBs := map[string]*worldstate.DBUpdates{
+					worldstate.DatabasesDBName: {
 						Writes: []*worldstate.KVWithMetadata{
 							{
 								Key:   "db1",
@@ -991,9 +983,8 @@ func TestStateDBCommitterForDBBlock(t *testing.T) {
 		{
 			name: "tx marked invalid",
 			setup: func(db worldstate.DB) {
-				createDBs := []*worldstate.DBUpdates{
-					{
-						DBName: worldstate.DatabasesDBName,
+				createDBs := map[string]*worldstate.DBUpdates{
+					worldstate.DatabasesDBName: {
 						Writes: []*worldstate.KVWithMetadata{
 							{
 								Key: "db1",
@@ -1259,9 +1250,8 @@ func TestProvenanceStoreCommitterForDataBlockWithValidTxs(t *testing.T) {
 	t.Parallel()
 
 	setup := func(env *committerTestEnv) {
-		createDB := []*worldstate.DBUpdates{
-			{
-				DBName: worldstate.DatabasesDBName,
+		createDB := map[string]*worldstate.DBUpdates{
+			worldstate.DatabasesDBName: {
 				Writes: []*worldstate.KVWithMetadata{
 					{
 						Key: "db1",
@@ -1271,9 +1261,8 @@ func TestProvenanceStoreCommitterForDataBlockWithValidTxs(t *testing.T) {
 		}
 		require.NoError(t, env.db.Commit(createDB, 1))
 
-		data := []*worldstate.DBUpdates{
-			{
-				DBName: worldstate.DefaultDBName,
+		data := map[string]*worldstate.DBUpdates{
+			worldstate.DefaultDBName: {
 				Writes: []*worldstate.KVWithMetadata{
 					constructDataEntryForTest("key0", []byte("value0"), &types.Metadata{
 						Version: &types.Version{
@@ -1283,8 +1272,7 @@ func TestProvenanceStoreCommitterForDataBlockWithValidTxs(t *testing.T) {
 					}),
 				},
 			},
-			{
-				DBName: "db1",
+			"db1": {
 				Writes: []*worldstate.KVWithMetadata{
 					constructDataEntryForTest("key0", []byte("value0"), &types.Metadata{
 						Version: &types.Version{
@@ -1836,9 +1824,8 @@ func TestProvenanceStoreCommitterForUserBlockWithValidTxs(t *testing.T) {
 	}
 
 	setup := func(env *committerTestEnv) {
-		data := []*worldstate.DBUpdates{
-			{
-				DBName: worldstate.UsersDBName,
+		data := map[string]*worldstate.DBUpdates{
+			worldstate.UsersDBName: {
 				Writes: []*worldstate.KVWithMetadata{
 					user1,
 				},
@@ -2057,20 +2044,14 @@ func TestProvenanceStoreCommitterForConfigBlockWithValidTxs(t *testing.T) {
 			},
 		}
 
-		configUpdates := []*worldstate.DBUpdates{
-			{
-				DBName: worldstate.ConfigDBName,
+		configUpdates := map[string]*worldstate.DBUpdates{
+			worldstate.ConfigDBName: {
 				Writes: []*worldstate.KVWithMetadata{
 					{
 						Key:      worldstate.ConfigKey,
 						Value:    clusterConfigWithTwoNodesSerialized,
 						Metadata: sampleMetadata,
 					},
-				},
-			},
-			{
-				DBName: worldstate.ConfigDBName,
-				Writes: []*worldstate.KVWithMetadata{
 					{
 						Key:      string(identity.NodeNamespace) + "bdb-node-1",
 						Value:    node1Serialized,
@@ -2083,8 +2064,7 @@ func TestProvenanceStoreCommitterForConfigBlockWithValidTxs(t *testing.T) {
 					},
 				},
 			},
-			{
-				DBName: worldstate.UsersDBName,
+			worldstate.UsersDBName: {
 				Writes: []*worldstate.KVWithMetadata{
 					{
 						Key:      string(identity.UserNamespace) + "admin1",
@@ -2668,9 +2648,8 @@ func TestConstructProvenanceEntriesForDataTx(t *testing.T) {
 				TxNum:    3,
 			},
 			setup: func(db worldstate.DB) {
-				createDB := []*worldstate.DBUpdates{
-					{
-						DBName: worldstate.DatabasesDBName,
+				createDB := map[string]*worldstate.DBUpdates{
+					worldstate.DatabasesDBName: {
 						Writes: []*worldstate.KVWithMetadata{
 							{
 								Key: "db1",
@@ -2703,13 +2682,11 @@ func TestConstructProvenanceEntriesForDataTx(t *testing.T) {
 					},
 				}
 
-				update := []*worldstate.DBUpdates{
-					{
-						DBName: worldstate.DefaultDBName,
+				update := map[string]*worldstate.DBUpdates{
+					worldstate.DefaultDBName: {
 						Writes: writes,
 					},
-					{
-						DBName: "db1",
+					"db1": {
 						Writes: writes,
 					},
 				}
