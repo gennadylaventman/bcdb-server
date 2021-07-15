@@ -4,7 +4,9 @@ package mptrie
 
 import (
 	"bytes"
+	fmt "fmt"
 	"sync"
+	"time"
 
 	"github.com/IBM-Blockchain/bcdb-server/pkg/crypto"
 	"github.com/pkg/errors"
@@ -454,9 +456,11 @@ func (t *MPTrie) Commit(blockNum uint64) error {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
+	start := time.Now()
 	if err := t.persistSubtrie(t.root); err != nil {
 		return err
 	}
+	fmt.Println("the time taken to persist sub trie is " + time.Since(start).String())
 	return t.store.CommitChanges(blockNum)
 }
 

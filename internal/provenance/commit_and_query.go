@@ -121,7 +121,7 @@ func (s *Store) Commit(blockNum uint64, txsData []*TxDataForProvenance) error {
 	}
 	s.logger.Infof("the time taken to apply deltas to cayley graph is %s", time.Since(start).String())
 
-	return s.cayleyGraph.Close()
+	return nil
 }
 
 func (s *Store) addReads(tx *TxDataForProvenance, cayleyTx *graph.Transaction) error {
