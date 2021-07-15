@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	interrors "github.com/IBM-Blockchain/bcdb-server/internal/errors"
 	"github.com/IBM-Blockchain/bcdb-server/pkg/types"
@@ -114,7 +115,13 @@ func (s *Store) Commit(blockNum uint64, txsData []*TxDataForProvenance) error {
 		}
 	}
 
-	return s.cayleyGraph.ApplyTransaction(cayleyTx)
+	start := time.Now()
+	if err := s.cayleyGraph.ApplyTransaction(cayleyTx); err != nil {
+		return err
+	}
+	s.logger.Infof("the time taken to apply deltas to cayley graph is %s", time.Since(start).String())
+
+	return s.cayleyGraph.Close()
 }
 
 func (s *Store) addReads(tx *TxDataForProvenance, cayleyTx *graph.Transaction) error {
