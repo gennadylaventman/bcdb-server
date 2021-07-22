@@ -21,11 +21,13 @@ const (
 func (s *Store) GetNode(nodePtr []byte) (mptrie.TrieNode, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	nodeGetTotal++
 	key := base64.StdEncoding.EncodeToString(nodePtr)
 	nodeBytes, ok := s.inMemoryNodes[key]
 	if !ok {
 		nodeBytes, ok = s.nodesToPersist[key]
 		if !ok {
+			nodeGetDB++
 			storedNodeBytes, err := s.trieDataDB.Get(append(trieNodesNs, []byte(key)...), &opt.ReadOptions{})
 			if err != nil {
 				return nil, err
@@ -118,7 +120,6 @@ func (s *Store) PersistNode(nodePtr []byte) (bool, error) {
 	nodeBytesWithType, ok := s.inMemoryNodes[key]
 	if ok {
 		s.nodesToPersist[key] = nodeBytesWithType
-		delete(s.inMemoryNodes, key)
 		return true, nil
 	}
 	return false, nil
@@ -131,7 +132,6 @@ func (s *Store) PersistValue(valuePtr []byte) (bool, error) {
 	valueBytes, ok := s.inMemoryValues[key]
 	if ok {
 		s.valuesToPersist[key] = valueBytes
-		delete(s.inMemoryValues, key)
 		return true, nil
 	}
 	return false, nil
@@ -171,6 +171,9 @@ func (s *Store) CommitChanges(blockNum uint64) error {
 	if err := s.trieDataDB.Write(batch, &opt.WriteOptions{Sync: true}); err != nil {
 		return err
 	}
+	s.logger.Infof("mptrie commit - total get ops %d, db get ops %d, put ops %d, persist ops %d", nodeGetTotal, nodeGetDB, len(s.inMemoryNodes), len(s.nodesToPersist))
+	nodeGetTotal = 0
+	nodeGetDB = 0
 	s.nodesToPersist = make(map[string]*NodeBytesWithType)
 	s.valuesToPersist = make(map[string][]byte)
 	s.inMemoryNodes = make(map[string]*NodeBytesWithType)

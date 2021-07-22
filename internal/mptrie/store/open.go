@@ -14,6 +14,8 @@ import (
 )
 
 var (
+	nodeGetTotal = 0
+	nodeGetDB = 0
 	// trieDataDBName holds all Merkle-Particia Trie (State Trie)
 	// data (both nodes and values) history
 	trieDataDBName = "triedata"
