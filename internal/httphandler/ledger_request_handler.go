@@ -45,6 +45,10 @@ func NewLedgerRequestHandler(db bcdb.DB, logger *logger.SugarLogger) http.Handle
 	handler.router.HandleFunc(constants.GetDataProof, handler.dataProof).Methods(http.MethodGet).Queries("block", "{blockId:[0-9]+}")
 	// HTTP GET "/ledger/tx/receipt/{txId}" gets transaction receipt
 	handler.router.HandleFunc(constants.GetTxReceipt, handler.txReceipt).Methods(http.MethodGet)
+	// HTTP GET "/ledger/tx/content/{txId}" gets transaction receipt
+	handler.router.HandleFunc(constants.GetTxContent, handler.txContent).Methods(http.MethodGet)
+	// HTTP GET "/ledger/tx/content/{txId}" gets transaction receipt
+	handler.router.HandleFunc(constants.GetHeight, handler.ledgerHeight).Methods(http.MethodGet)
 	// HTTP GET "/ledger/path?start={startId}&end={endId}" with invalid query params
 	handler.router.HandleFunc(constants.GetPath, handler.invalidPathQuery).Methods(http.MethodGet)
 	// HTTP GET "/ledger/proof/tx/{blockId}?idx={idx}" with invalid query params
@@ -200,6 +204,70 @@ func (p *ledgerRequestHandler) txReceipt(response http.ResponseWriter, request *
 	query := payload.(*types.GetTxReceiptQuery)
 
 	data, err := p.db.GetTxReceipt(query.UserId, query.TxId)
+	if err != nil {
+		var status int
+
+		switch err.(type) {
+		case *errors.PermissionErr:
+			status = http.StatusForbidden
+		case *errors.NotFoundErr:
+			status = http.StatusNotFound
+		default:
+			status = http.StatusInternalServerError
+		}
+
+		SendHTTPResponse(
+			response,
+			status,
+			&types.HttpResponseErr{
+				ErrMsg: "error while processing '" + request.Method + " " + request.URL.String() + "' because " + err.Error(),
+			})
+		return
+	}
+
+	SendHTTPResponse(response, http.StatusOK, data)
+}
+
+func (p *ledgerRequestHandler) txContent(response http.ResponseWriter, request *http.Request) {
+	payload, respondedErr := extractVerifiedQueryPayload(response, request, constants.GetTxContent, p.sigVerifier)
+	if respondedErr {
+		return
+	}
+	query := payload.(*types.GetTxQuery)
+
+	data, err := p.db.GetTx(query.UserId, query.TxId)
+	if err != nil {
+		var status int
+
+		switch err.(type) {
+		case *errors.PermissionErr:
+			status = http.StatusForbidden
+		case *errors.NotFoundErr:
+			status = http.StatusNotFound
+		default:
+			status = http.StatusInternalServerError
+		}
+
+		SendHTTPResponse(
+			response,
+			status,
+			&types.HttpResponseErr{
+				ErrMsg: "error while processing '" + request.Method + " " + request.URL.String() + "' because " + err.Error(),
+			})
+		return
+	}
+
+	SendHTTPResponse(response, http.StatusOK, data)
+}
+
+func (p *ledgerRequestHandler) ledgerHeight(response http.ResponseWriter, request *http.Request) {
+	payload, respondedErr := extractVerifiedQueryPayload(response, request, constants.GetHeight, p.sigVerifier)
+	if respondedErr {
+		return
+	}
+	query := payload.(*types.GetLedgerHeightQuery)
+
+	data, err := p.db.GetLedgerHeight(query.UserId)
 	if err != nil {
 		var status int
 

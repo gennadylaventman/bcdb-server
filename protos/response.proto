@@ -186,3 +186,28 @@ message TxReceiptResponse {
   ResponseHeader header = 1;
   TxReceipt receipt = 2;
 }
+
+message GetTxResponseEnvelope {
+  TxReceiptResponse response = 1;
+  bytes signature = 2;
+}
+
+message GetTxResponse {
+  ResponseHeader header = 1;
+  oneof Tx {
+    DataTxEnvelope data_tx = 2;
+    ConfigTxEnvelope config_tx = 3;
+    UserAdministrationTxEnvelope user_tx = 4;
+    DataTxEnvelope database_tx = 5;
+  }
+}
+
+message GetLedgerHeightResponseEnvelope {
+  GetLedgerHeightResponse response = 1;
+  bytes signature = 2;
+}
+
+message GetLedgerHeightResponse {
+  ResponseHeader header = 1;
+  uint64 ledger_height = 2;
+}

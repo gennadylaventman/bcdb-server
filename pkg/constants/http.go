@@ -36,11 +36,13 @@ const (
 	LedgerEndpoint     = "/ledger/"
 	GetBlockHeader     = "/ledger/block/{blockId:[0-9]+}"
 	GetPath            = "/ledger/path"
+	GetHeight          = "/ledger/height"
 	GetTxProofPrefix   = "/ledger/proof/tx"
 	GetTxProof         = "/ledger/proof/tx/{blockId:[0-9]+}"
 	GetDataProofPrefix = "/ledger/proof/data"
 	GetDataProof       = "/ledger/proof/data/{dbname:" + `[0-9a-zA-Z_\-\.]+` + "}/{key}"
 	GetTxReceipt       = "/ledger/tx/receipt/{txId}"
+	GetTxContent       = "/ledger/tx/content/{txId}"
 
 	ProvenanceEndpoint      = "/provenance/"
 	GetHistoricalData       = "/provenance/data/history/{dbname}/{key}"
@@ -191,4 +193,12 @@ func URLForGetMostRecentUserInfo(userID string, version *types.Version) string {
 func URLForGetMostRecentNodeConfig(nodeID string, version *types.Version) string {
 	return ProvenanceEndpoint + path.Join("node", nodeID) +
 		fmt.Sprintf("?blocknumber=%d&transactionnumber=%d", version.BlockNum, version.TxNum)
+}
+
+func URLForGetLedgerHeight() string {
+	return GetHeight
+}
+
+func URLForGetTransaction(txId string) string {
+	return LedgerEndpoint + path.Join("tx", "content", txId)
 }

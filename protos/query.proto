@@ -192,6 +192,25 @@ message GetTxReceiptQueryEnvelope {
   bytes signature = 2;
 }
 
+message GetTxQuery {
+  string user_id = 1;
+  string tx_id = 2;
+}
+
+message GetTxQueryEnvelope {
+  GetTxQuery payload = 1;
+  bytes signature = 2;
+}
+
+message GetLedgerHeightQuery {
+  string user_id = 1;
+}
+
+message GetLedgerHeightQueryEnvelope {
+  GetLedgerHeightQuery payload = 1;
+  bytes signature = 2;
+}
+
 message GetMostRecentUserOrNodeQuery {
     enum Type {
         USER = 0;
@@ -201,4 +220,11 @@ message GetMostRecentUserOrNodeQuery {
     string user_id = 2;
     string id = 3;
     Version  version = 4;
+}
+
+enum TxType {
+  DATA_TX = 0;
+  CONFIG_TX = 1;
+  USER_TX = 2;
+  DATABASE_TX = 3;
 }

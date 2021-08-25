@@ -93,7 +93,7 @@ type DB interface {
 	// GetValuesReadByUser returns all values read by a given user
 	GetValuesReadByUser(userID string) (*types.GetDataProvenanceResponseEnvelope, error)
 
-	// GetValuesReadByUser returns all values read by a given user
+	// GetValuesWrittenByUser returns all values wrote by a given user
 	GetValuesWrittenByUser(userID string) (*types.GetDataProvenanceResponseEnvelope, error)
 
 	// GetValuesDeletedByUser returns all values deleted by a given user
@@ -102,7 +102,7 @@ type DB interface {
 	// GetReaders returns all userIDs who have accessed a given key as well as the access frequency
 	GetReaders(dbName, key string) (*types.GetDataReadersResponseEnvelope, error)
 
-	// GetReaders returns all userIDs who have accessed a given key as well as the access frequency
+	// GetWriters returns all userIDs who have written to a given key as well as the writes frequency
 	GetWriters(dbName, key string) (*types.GetDataWritersResponseEnvelope, error)
 
 	// GetTxIDsSubmittedByUser returns all ids of all transactions submitted by a given user
@@ -111,6 +111,13 @@ type DB interface {
 	// GetTxReceipt returns transaction receipt - block header of ledger block that contains the transaction
 	// and transaction index inside the block
 	GetTxReceipt(userId string, txID string) (*types.TxReceiptResponseEnvelope, error)
+
+	// GetTx returns transaction envelope
+	GetTx(userId string, txID string) (*types.GetTxResponseEnvelope, error)
+
+	// GetLedgerHeight returns current height of the ledger
+	GetLedgerHeight(userId string,) (*types.GetLedgerHeightResponseEnvelope, error)
+
 
 	// SubmitTransaction submits transaction to the database with a timeout. If the timeout is
 	// set to 0, the submission would be treated as async while a non-zero timeout would be
@@ -488,6 +495,15 @@ func (d *db) GetTxReceipt(userId string, txID string) (*types.TxReceiptResponseE
 		Signature: sign,
 	}, nil
 }
+
+func (d *db) GetTx(userId string, txID string) (*types.GetTxResponseEnvelope, error) {
+	return nil, nil
+}
+
+func (d *db) GetLedgerHeight(userId string,) (*types.GetLedgerHeightResponseEnvelope, error) {
+	return nil, nil
+}
+
 
 // GetValues returns all values associated with a given key
 func (d *db) GetValues(dbName, key string) (*types.GetHistoricalDataResponseEnvelope, error) {
