@@ -64,10 +64,10 @@ blockCreation:
 
   # maxTransactionCountPerBlock denotes the maximum allowed number of
   # transactions per block
-  maxTransactionCountPerBlock: 1
+  maxTransactionCountPerBlock: 500
 
   # blockTimeout denotes the block timeout in milliseconds
-  blockTimeout: 50ms
+  blockTimeout: 500ms
 
 # The replication settings specific to this server.
 replication:
