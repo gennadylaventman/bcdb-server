@@ -17,9 +17,9 @@ import (
 func TestValidateDBAdminTx(t *testing.T) {
 	t.Parallel()
 
-	cryptoDir := testutils.GenerateTestClientCrypto(t, []string{"userWithMorePrivilege", "userWithLessPrivilege"})
-	adminCert, adminSigner := testutils.LoadTestClientCrypto(t, cryptoDir, "userWithMorePrivilege")
-	nonAdminCert, nonAdminSigner := testutils.LoadTestClientCrypto(t, cryptoDir, "userWithLessPrivilege")
+	cryptoDir := testutils.GenerateTestCrypto(t, []string{"userWithMorePrivilege", "userWithLessPrivilege"})
+	adminCert, adminSigner := testutils.LoadTestCrypto(t, cryptoDir, "userWithMorePrivilege")
+	nonAdminCert, nonAdminSigner := testutils.LoadTestCrypto(t, cryptoDir, "userWithLessPrivilege")
 
 	sampleMetadataData := &types.Metadata{
 		Version: &types.Version{
@@ -495,6 +495,24 @@ func TestValidateIndexDBEntries(t *testing.T) {
 			expectedResult: &types.ValidationInfo{
 				Flag:            types.Flag_INVALID_INCORRECT_ENTRIES,
 				ReasonIfInvalid: "index definion provided for database [db1] cannot be processed as the database is present in the delete list",
+			},
+		},
+		{
+			name: "invalid: index update on an existing database",
+			setup: func(db worldstate.DB) {
+				createDB := map[string]*worldstate.DBUpdates{worldstate.DatabasesDBName: {Writes: []*worldstate.KVWithMetadata{{Key: "db1"}}}}
+				require.NoError(t, db.Commit(createDB, 1))
+			},
+			toCreateDBs: []string{},
+			toDeleteDBs: []string{},
+			dbsIndex: map[string]*types.DBIndex{
+				"db1": {
+					AttributeAndType: map[string]types.IndexAttributeType{"attr1": types.IndexAttributeType_STRING},
+				},
+			},
+			expectedResult: &types.ValidationInfo{
+				Flag:            types.Flag_INVALID_INCORRECT_ENTRIES,
+				ReasonIfInvalid: "index update to an existing database is not allowed",
 			},
 		},
 		{

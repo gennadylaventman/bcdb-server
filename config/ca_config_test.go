@@ -3,15 +3,16 @@ package config
 import (
 	"crypto/x509"
 	"encoding/pem"
-	"github.com/hyperledger-labs/orion-server/pkg/server/testutils"
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"path"
 	"testing"
+
+	"github.com/hyperledger-labs/orion-server/pkg/server/testutils"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCAConfiguration_WriteBundle(t *testing.T) {
-	cryptoDir := testutils.GenerateTestClientCrypto(t, []string{"user", "node"}, true)
+	cryptoDir := testutils.GenerateTestCrypto(t, []string{"user", "node"}, true)
 
 	rootCAFileName := path.Join(cryptoDir, testutils.RootCAFileName+".pem")
 	interCAFileName := path.Join(cryptoDir, testutils.IntermediateCAFileName+".pem")

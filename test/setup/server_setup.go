@@ -50,6 +50,7 @@ type Server struct {
 	adminID              string
 	adminCertPath        string
 	adminKeyPath         string
+	usersCryptoDir       string
 	adminSigner          crypto.Signer
 	cmd                  *exec.Cmd
 	outBuffer            *gbytes.Buffer
@@ -61,7 +62,6 @@ type Server struct {
 
 // NewServer creates a new blockchain database server
 func NewServer(id uint64, clusterBaseDir string, baseNodePort, basePeerPort uint32, checkRedirect func(req *http.Request, via []*http.Request) error, logger *logger.SugarLogger) (*Server, error) {
-
 	sNumber := strconv.FormatInt(int64(id+1), 10)
 	s := &Server{
 		serverNum:           id + 1,
@@ -74,6 +74,7 @@ func NewServer(id uint64, clusterBaseDir string, baseNodePort, basePeerPort uint
 		configFilePath:      filepath.Join(clusterBaseDir, "node-"+sNumber, "config.yml"),
 		bootstrapFilePath:   filepath.Join(clusterBaseDir, "node-"+sNumber, "shared-config-bootstrap.yml"),
 		cryptoMaterialsDir:  filepath.Join(clusterBaseDir, "node-"+sNumber, "crypto"),
+		usersCryptoDir:      filepath.Join(clusterBaseDir, "users"),
 		clientCheckRedirect: checkRedirect,
 		logger:              logger,
 	}
@@ -101,6 +102,61 @@ func (s *Server) AdminSigner() crypto.Signer {
 	defer s.mu.Unlock()
 
 	return s.adminSigner
+}
+
+func (s *Server) Signer(userID string) (crypto.Signer, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	signer, err := crypto.NewSigner(
+		&crypto.SignerOptions{
+			Identity:    userID,
+			KeyFilePath: path.Join(s.usersCryptoDir, userID+".key"),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return signer, nil
+}
+
+func (s *Server) QueryBlockStatus(t *testing.T) (*types.GetBlockResponseEnvelope, error) {
+	client, err := s.NewRESTClient(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := &types.GetBlockQuery{
+		UserId: s.AdminID(),
+	}
+	response, err := client.GetLastBlockStatus(
+		&types.GetBlockQueryEnvelope{
+			Payload:   query,
+			Signature: testutils.SignatureFromQuery(t, s.AdminSigner(), query),
+		},
+	)
+
+	return response, err
+}
+
+func (s *Server) QueryClusterStatus(t *testing.T) (*types.GetClusterStatusResponseEnvelope, error) {
+	client, err := s.NewRESTClient(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := &types.GetClusterStatusQuery{
+		UserId: s.AdminID(),
+	}
+	response, err := client.GetClusterStatus(
+		&types.GetClusterStatusQueryEnvelope{
+			Payload:   query,
+			Signature: testutils.SignatureFromQuery(t, s.AdminSigner(), query),
+		},
+	)
+
+	return response, err
 }
 
 func (s *Server) QueryConfig(t *testing.T) (*types.GetConfigResponseEnvelope, error) {
@@ -143,12 +199,72 @@ func (s *Server) QueryData(t *testing.T, db, key string) (*types.GetDataResponse
 	return response, err
 }
 
-func (s *Server) WriteDataTx(t *testing.T, db, key string, value []byte) (string, *types.TxReceipt, error) {
-	client, err := s.NewRESTClient(s.clientCheckRedirect)
+func (s *Server) QueryUser(t *testing.T, userID string) (*types.GetUserResponseEnvelope, error) {
+	client, err := s.NewRESTClient(nil)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
+	query := &types.GetUserQuery{
+		UserId:       s.AdminID(),
+		TargetUserId: userID,
+	}
+	response, err := client.GetUser(
+		&types.GetUserQueryEnvelope{
+			Payload:   query,
+			Signature: testutils.SignatureFromQuery(t, s.AdminSigner(), query),
+		},
+	)
+
+	return response, err
+}
+
+func (s *Server) GetDBStatus(t *testing.T, dbName string) (*types.GetDBStatusResponseEnvelope, error) {
+	client, err := s.NewRESTClient(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	query := &types.GetDBStatusQuery{
+		UserId: s.AdminID(),
+		DbName: dbName,
+	}
+	response, err := client.GetDBStatus(
+		&types.GetDBStatusQueryEnvelope{
+			Payload:   query,
+			Signature: testutils.SignatureFromQuery(t, s.AdminSigner(), query),
+		},
+	)
+
+	return response, err
+}
+
+func (s *Server) GetDBIndex(t *testing.T, dbName string, userID string) (*types.GetDBIndexResponseEnvelope, error) {
+	client, err := s.NewRESTClient(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	signer, err := s.Signer(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	query := &types.GetDBIndexQuery{
+		UserId: userID,
+		DbName: dbName,
+	}
+	response, err := client.GetDBIndex(
+		&types.GetDBIndexQueryEnvelope{
+			Payload:   query,
+			Signature: testutils.SignatureFromQuery(t, signer, query),
+		},
+	)
+
+	return response, err
+}
+
+func (s *Server) WriteDataTx(t *testing.T, db, key string, value []byte) (string, *types.TxReceipt, error) {
 	txID := uuid.New().String()
 	dataTx := &types.DataTx{
 		MustSignUserIds: []string{"admin"},
@@ -167,13 +283,109 @@ func (s *Server) WriteDataTx(t *testing.T, db, key string, value []byte) (string
 	}
 
 	// Post transaction into new database
-	response, err := client.SubmitTransaction(constants.PostDataTx,
-		&types.DataTxEnvelope{
-			Payload: dataTx,
-			Signatures: map[string][]byte{
-				"admin": testutils.SignatureFromTx(t, s.AdminSigner(), dataTx),
-			},
-		})
+	receipt, err := s.SubmitTransaction(t, constants.PostDataTx, &types.DataTxEnvelope{
+		Payload:    dataTx,
+		Signatures: map[string][]byte{"admin": testutils.SignatureFromTx(t, s.AdminSigner(), dataTx)},
+	})
+	if err != nil {
+		return txID, nil, err
+	}
+
+	return txID, receipt, nil
+}
+
+func (s *Server) CreateUsers(t *testing.T, users []*types.UserWrite) (*types.TxReceipt, error) {
+	userTx := &types.UserAdministrationTx{
+		UserId:     "admin",
+		TxId:       uuid.New().String(),
+		UserWrites: users,
+	}
+
+	receipt, err := s.SubmitTransaction(t, constants.PostUserTx, &types.UserAdministrationTxEnvelope{
+		Payload:   userTx,
+		Signature: testutils.SignatureFromTx(t, s.AdminSigner(), userTx),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return receipt, nil
+
+}
+
+func (s *Server) SubmitTransaction(t *testing.T, urlPath string, tx interface{}) (*types.TxReceipt, error) {
+	client, err := s.NewRESTClient(s.clientCheckRedirect)
+	if err != nil {
+		return nil, err
+	}
+
+	// Post transaction into new database
+	response, err := client.SubmitTransaction(urlPath, tx, 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		var errMsg string
+		if response.StatusCode == http.StatusAccepted {
+			return nil, errors.Errorf("ServerTimeout")
+		}
+		if response.Body != nil {
+			errRes := &types.HttpResponseErr{}
+			if err = json.NewDecoder(response.Body).Decode(errRes); err != nil {
+				errMsg = "(failed to parse the server's error message)"
+			} else {
+				errMsg = errRes.Error()
+			}
+		}
+
+		return nil, errors.Errorf("failed to submit transaction, server returned: status: %s, message: %s", response.Status, errMsg)
+	}
+
+	txResponseEnvelope := &types.TxReceiptResponseEnvelope{}
+	err = json.NewDecoder(response.Body).Decode(txResponseEnvelope)
+	if err != nil {
+		t.Errorf("error: %s", err)
+		return nil, err
+	}
+
+	receipt := txResponseEnvelope.GetResponse().GetReceipt()
+
+	if receipt != nil {
+		validationInfo := receipt.GetHeader().GetValidationInfo()
+		if validationInfo == nil {
+			return receipt, errors.Errorf("server error: validation info is nil")
+		} else {
+			validFlag := validationInfo[receipt.TxIndex].GetFlag()
+			if validFlag != types.Flag_VALID {
+				return receipt, errors.Errorf("TxValidation: Flag: %s, Reason: %s", validFlag, validationInfo[receipt.TxIndex].ReasonIfInvalid)
+			}
+		}
+	}
+
+	return receipt, nil
+}
+
+func (s *Server) SetConfigTx(t *testing.T, newConfig *types.ClusterConfig, version *types.Version, signer crypto.Signer) (string, *types.TxReceipt, error) {
+	client, err := s.NewRESTClient(s.clientCheckRedirect)
+	if err != nil {
+		return "", nil, err
+	}
+
+	txID := uuid.New().String()
+	configTx := &types.ConfigTx{
+		UserId:               "admin",
+		TxId:                 txID,
+		ReadOldConfigVersion: version,
+		NewConfig:            newConfig,
+	}
+
+	// Post transaction into new database
+	response, err := client.SubmitTransaction(constants.PostConfigTx, &types.ConfigTxEnvelope{
+		Payload:   configTx,
+		Signature: testutils.SignatureFromTx(t, signer, configTx),
+	}, 30*time.Second)
 
 	if err != nil {
 		return txID, nil, err
@@ -414,16 +626,20 @@ func (s *Server) URL() string {
 	return "http://" + s.address + ":" + strconv.FormatInt(int64(s.nodePort), 10)
 }
 
+func (s *Server) ID() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.serverID
+}
+
 // NewRESTClient creates a new REST client for the user to submit requests and transactions
 // to the server
 func (s *Server) NewRESTClient(checkRedirect func(req *http.Request, via []*http.Request) error) (*mock.Client, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return mock.NewRESTClient(
-		s.URL(),
-		checkRedirect,
-	)
+	return mock.NewRESTClient(s.URL(), checkRedirect, nil)
 }
 
 // testFailure is in lieu of *testing.T for gomega's types.GomegaTestingT
@@ -432,4 +648,7 @@ type testFailure struct {
 
 func (t *testFailure) Fatalf(format string, args ...interface{}) {
 	log.Printf(format, args...)
+}
+
+func (t *testFailure) Helper() {
 }
